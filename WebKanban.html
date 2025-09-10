@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Kanban Agile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+        const { Plus, Edit3, Trash2 } = window.lucideReact || {};
+
+        const KanbanBoard = () => {
+            const [columns, setColumns] = useState([
+                {
+                    id: 'backlog',
+                    title: 'Backlog',
+                    color: 'bg-gray-500',
+                    tasks: [
+                        { id: '1', title: 'Definir requisitos del proyecto', description: 'Recopilar y documentar los requisitos del cliente', priority: 'alta' },
+                        { id: '2', title: 'Crear mockups de diseño', description: 'Diseñar interfaces de usuario para validación', priority: 'media' }
+                    ]
+                },
+                {
+                    id: 'todo',
+                    title: 'Por Hacer',
+                    color: 'bg-blue-500',
+                    tasks: [
+                        { id: '3', title: 'Configurar entorno de desarrollo', description: 'Instalar herramientas y dependencias necesarias', priority: 'alta' },
+                        { id: '4', title: 'Implementar autenticación', description: 'Desarrollar sistema de login y registro', priority: 'alta' }
+                    ]
+                },
+                {
+                    id: 'inprogress',
+                    title: 'En Progreso',
+                    color: 'bg-yellow-500',
+                    tasks: [
+                        { id: '5', title: 'Desarrollar API REST', description: 'Crear endpoints para el backend', priority: 'alta' },
+                        { id: '6', title: 'Diseñar base de datos', description: 'Modelar estructura de datos y relaciones', priority: 'media' }
+                    ]
+                },
+                {
+                    id: 'review',
+                    title: 'Revisión',
+                    color: 'bg-purple-500',
+                    tasks: [
+                        { id: '7', title: 'Pruebas unitarias', description: 'Ejecutar y corregir tests automatizados', priority: 'media' }
+                    ]
+                },
+                {
+                    id: 'done',
+                    title: 'Completado',
+                    color: 'bg-green-500',
+                    tasks: [
+                        { id: '8', title: 'Documentación técnica', description: 'Crear documentación del código y APIs', priority: 'baja' }
+                    ]
+                }
+            ]);
+
+            const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'media' });
+            const [selectedColumn, setSelectedColumn] = useState('backlog');
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [draggedTask, setDraggedTask] = useState(null);
+            const [editingTask, setEditingTask] = useState(null);
+
+            const handleAddTask = () => {
+                if (newTask.title.trim()) {
+                    const updatedColumns = columns.map(column => {
+                        if (column.id === selectedColumn) {
+                            return {
+                                ...column,
+                                tasks: [
+                                    ...column.tasks,
+                                    {
+                                        id: Date.now().toString(),
+                                        ...newTask
+                                    }
+                                ]
+                            };
+                        }
+                        return column;
+                    });
+                    setColumns(updatedColumns);
+                    setNewTask({ title: '', description: '', priority: 'media' });
+                    setIsModalOpen(false);
+                }
+            };
+
+            const handleUpdateTask = () => {
+                if (editingTask.title.trim()) {
+                    const updatedColumns = columns.map(column => {
+                        return {
+                            ...column,
+                            tasks: column.tasks.map(task => 
+                                task.id === editingTask.id ? editingTask : task
+                            )
+                        };
+                    });
+                    setColumns(updatedColumns);
+                    setEditingTask(null);
+                }
+            };
+
+            const handleDeleteTask = (taskId, columnId) => {
+                const updatedColumns = columns.map(column => {
+                    if (column.id === columnId) {
+                        return {
+                            ...column,
+                            tasks: column.tasks.filter(task => task.id !== taskId)
+                        };
+                    }
+                    return column;
+                });
+                setColumns(updatedColumns);
+            };
+
+            const handleDragStart = (e, task, columnId) => {
+                setDraggedTask({ task, sourceColumnId: columnId });
+                e.dataTransfer.effectAllowed = 'move';
+            };
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            };
+
+            const handleDrop = (e, targetColumnId) => {
+                e.preventDefault();
+                if (!draggedTask) return;
+
+                const { task, sourceColumnId } = draggedTask;
+
+                if (sourceColumnId === targetColumnId) {
+                    setDraggedTask(null);
+                    return;
+                }
+
+                const updatedColumns = columns.map(column => {
+                    if (column.id === sourceColumnId) {
+                        return {
+                            ...column,
+                            tasks: column.tasks.filter(t => t.id !== task.id)
+                        };
+                    }
+                    if (column.id === targetColumnId) {
+                        return {
+                            ...column,
+                            tasks: [...column.tasks, task]
+                        };
+                    }
+                    return column;
+                });
+
+                setColumns(updatedColumns);
+                setDraggedTask(null);
+            };
+
+            const getPriorityColor = (priority) => {
+                switch (priority) {
+                    case 'alta': return 'bg-red-100 text-red-800';
+                    case 'media': return 'bg-yellow-100 text-yellow-800';
+                    case 'baja': return 'bg-green-100 text-green-800';
+                    default: return 'bg-gray-100 text-gray-800';
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+                    {/* Header */}
+                    <div className="max-w-7xl mx-auto mb-8">
+                        <div className="flex justify-between items-center bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-800">Panel Kanban Agile</h1>
+                                <p className="text-gray-600 mt-2">Gestiona tus proyectos con metodología Agile</p>
+                            </div>
+                            <button
+                                onClick={() => setIsModalOpen(true)}
+                                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors shadow-md"
+                            >
+                                <i className="fas fa-plus"></i>
+                                Nueva Tarea
+                            </button>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+                            {columns.map(column => (
+                                <div key={column.id} className="bg-white rounded-lg shadow-md p-4 text-center">
+                                    <div className={`w-4 h-4 rounded-full ${column.color} mx-auto mb-2`}></div>
+                                    <h3 className="font-semibold text-gray-700">{column.title}</h3>
+                                    <p className="text-2xl font-bold text-gray-800">{column.tasks.length}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Kanban Board */}
+                    <div className="max-w-7xl mx-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                            {columns.map(column => (
+                                <div
+                                    key={column.id}
+                                    className="bg-gray-50 rounded-xl shadow-sm"
+                                    onDragOver={handleDragOver}
+                                    onDrop={(e) => handleDrop(e, column.id)}
+                                >
+                                    <div className={`p-4 rounded-t-xl ${column.color} text-white`}>
+                                        <h2 className="font-bold text-lg">{column.title}</h2>
+                                        <span className="text-sm opacity-90">{column.tasks.length} tareas</span>
+                                    </div>
+                                    
+                                    <div className="p-4 space-y-4 min-h-96">
+                                        {column.tasks.map(task => (
+                                            <div
+                                                key={task.id}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, task, column.id)}
+                                                className="bg-white rounded-lg shadow-md p-4 cursor-move hover:shadow-lg transition-shadow"
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h3 className="font-semibold text-gray-800 text-sm">{task.title}</h3>
+                                                    <div className="flex gap-1">
+                                                        <button 
+                                                            onClick={() => setEditingTask({...task})}
+                                                            className="text-gray-400 hover:text-gray-600"
+                                                        >
+                                                            <i className="fas fa-edit"></i>
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteTask(task.id, column.id)}
+                                                            className="text-gray-400 hover:text-red-500"
+                                                        >
+                                                            <i className="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <p className="text-gray-600 text-xs mb-3">{task.description}</p>
+                                                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
+                                                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Modal para nueva tarea */}
+                    {isModalOpen && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                                <div className="p-6">
+                                    <h2 className="text-2xl font-bold text-gray-800 mb-6">Nueva Tarea</h2>
+                                    
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                                            <input
+                                                type="text"
+                                                value={newTask.title}
+                                                onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                                placeholder="Nombre de la tarea"
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                                            <textarea
+                                                value={newTask.description}
+                                                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                                rows="3"
+                                                placeholder="Descripción detallada"
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                                            <select
+                                                value={newTask.priority}
+                                                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            >
+                                                <option value="baja">Baja</option>
+                                                <option value="media">Media</option>
+                                                <option value="alta">Alta</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Columna</label>
+                                            <select
+                                                value={selectedColumn}
+                                                onChange={(e) => setSelectedColumn(e.target.value)}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            >
+                                                {columns.map(column => (
+                                                    <option key={column.id} value={column.id}>{column.title}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex gap-3 mt-8">
+                                        <button
+                                            onClick={() => setIsModalOpen(false)}
+                                            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={handleAddTask}
+                                            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                                        >
+                                            Crear Tarea
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal para editar tarea */}
+                    {editingTask && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                                <div className="p-6">
+                                    <h2 className="text-2xl font-bold text-gray-800 mb-6">Editar Tarea</h2>
+                                    
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                                            <input
+                                                type="text"
+                                                value={editingTask.title}
+                                                onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                                            <textarea
+                                                value={editingTask.description}
+                                                onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                                rows="3"
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                                            <select
+                                                value={editingTask.priority}
+                                                onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            >
+                                                <option value="baja">Baja</option>
+                                                <option value="media">Media</option>
+                                                <option value="alta">Alta</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex gap-3 mt-8">
+                                        <button
+                                            onClick={() => setEditingTask(null)}
+                                            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={handleUpdateTask}
+                                            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                                        >
+                                            Guardar Cambios
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const App = () => {
+            return (
+                <div className="App">
+                    <KanbanBoard />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
